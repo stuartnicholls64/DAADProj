@@ -1,0 +1,105 @@
+Summary of Important Files, what they do and how to use them
+
+What order to run the files
+1. root_numpy_stu.py, This converts the Ttree data into numpy arrays.
+2. DeepSetTensors_withvalidation.py, This turns the numpy arrays into a form that can be used as input and output in a neural network.
+3. DeepSets_big.py or DeepSets_big_dl.py. These implement the deep sets neural networks. The former file uses the x,y,z coordinates of the LLP vertex as output. The latter file uses the decay lifetime (in mm) as the output. FullConn.py can also be run concurrently with these (it is just a simple fully connected network)
+
+After running these last files, there will be many pngs saved, and the output file will print out some relevant statistics. 
+
+Other things to note
+So far, I have only used the data with _trian and _test. The data saved as _validation has not been used.
+
+root_to_numpy_stu.py
+What it does: This file converts the data in the SignalJets Ttree into numpy arrays, which are then saved in the current directory.
+
+What files it takes as inputs or loads: The data from the SignalJets Ttree, currently stored in VBFH_HToSSTobbbb_MH-125_MS-20_ctauS-10_TuneCUETP8M1_13TeV_Tranche3_PRIVATE-MC_skimmed_decayLength_genVb.root
+
+What files it saves: 
+the data for input to ML: './PFC_data_%s_%s.npy'%(mepz, poca)
+the data as target (pos. of vertex): './SV_true_%s_%s.npy'%(mepz, poca)
+the data as target(lifetime length): './decay_len_%s_%s.npy'%(mepz, poca)
+
+How to adjust it:
+to add or subtract inputs from the Ttree, just add or subtract their names in PFCatts (PFCandidate attributes).
+
+You may want to edit the elements of mepz_opts, and which elements of mepz_opts you loop over, if you change the inputs to the data, in order to distinguish this dataset from previous datasets containing other input features. Then, of course, you will need to introduce this name to the subsequent files you use (DeepSetTensors_withvalidation and e.g. DeepSets_big) when loading and saving data.
+
+Note that pdgId is listed as the last feature in PFCatts, but this is not intended for use in the final input to the network. In the next file to be run, DeepSetTensors_withvalidation, the pdgId will be used to make a cut on the particles, and this column will then be replaced by theta.
+
+Be careful if adding input variables, as variables are called by their position in the array in DeepSetTensors_withvalidation. The necessary rules to follow are listed in the code.
+
+
+DeepSetTensors_withvalidation.ipynb (it is an interactive notebook)
+what it does: it takes the PFC_data_…, SV_true_.. and decay_len_… numpy arrays generated from root_to_numpy_stu.py and splits them into training, test and validation data in a 60/20/20 ratio. It applies the following cuts:
+- remove particles where pdgId = 0, charge = 0 or pT < 1
+Then it creates and saves two separate sets of data: one with all of the jets, another with only jets for which the lifetime of the LLP was > 5mm. 
+
+What files it takes as inputs or loads: 
+the data for input to ML: './PFC_data_%s_%s.npy'%(mepz, poca)
+the data as target (pos. of vertex): './SV_true_%s_%s.npy'%(mepz, poca)
+the data as target(lifetime length): './decay_len_%s_%s.npy'%(mepz, poca)
+
+What files it saves: 
+torch tensors of X,y train, test and validation data for use in DeepSets_big, DeepSets_big_dl, with mepz = ‘hasTHETA_CHI2’:
+e.g 'X_train_%s_%s_%s_%s_%s.pt'%(iserr, mepz, poca, scal, ptc)
+the output data for DeepSets_big is:
+'y_train_%s_%s_%s_%s_%s.pt'%(iserr, mepz, poca, scal, ptc), and y_test_...etc.
+the output data for DeepSets_big_dl (dl=decay length) is:
+'ydl_train_%s_%s_%s_%s_%s.pt'%(iserr, mepz, poca, scal, ptc)
+
+In addition, it also saves for use in  DeepSets_big and DeepSets_big_dl, data with mepz = ‘'hasTHETA_CHI2_dlCut', which has otherwise the same file names as the above data. This data has had all jets with LLP lifetime < 5mm removed.
+
+
+How to adjust it:
+again, you can change the mepz, to load different data from root_numpy_stu.py, and to save different data for use in the neural networks. 
+
+DeepSets_big.py
+
+what it does: this loads the train and test data created in DeepSetTensors_withvalidation, and trains a deep sets architecture on this. The input data are the features of a jet, and depending on the choice of mepz, these features will be different (or, as it stands currently, looping over mepz = ‘hasTHETA_CHI2’ and mepz = ‘'hasTHETA_CHI2_dlCut', these two datasets have the same input features but the latter is smaller than the former, because it has had all entries where LLP lifetime < 5mm cut out). It creates and saves many plots after finishing training. So if you run this file you will get a large number of plots in two sets: one set for when the network is trained on all data, and one set in which the network is trained only on lifetime > 5mm data.
+
+What files it takes as inputs or loads: 
+tensors created in the first half of DeepSetTensors_withvalidation. If the values of iserr, mepz, poca, scal or ptc were changed in  DeepSetTensors_withvalidation then you can change this at the top of this file
+X_train_%s_%s_%s_%s_%s.pt'%(iserr, mepz, poca, scal, ptc)
+y_train_%s_%s_%s_%s_%s.pt'%(iserr, mepz, poca, scal, ptc)
+X_test_%s_%s_%s_%s_%s.pt'%(iserr, mepz, poca, scal, ptc)
+'y_test_%s_%s_%s_%s_%s.pt'%(iserr, mepz, poca, scal, ptc)
+'ydl_test_%s_%s_%s_%s_%s.pt'%(iserr, mepz, poca, scal, ptc): this is used only for the analysis of results of the neural network, once training is finished
+
+
+What files it saves: 
+Many plots and numpy arrays measuring performance of network.
+Loss function over epochs: "Loss_over_epochs_draft_%s.png"%model_deets
+A numpy array and a histogram of the mean distance between the predicted and true vertex position:
+"./Distances_to_SV_%s.npy"%model_deets
+"Distance_to_true_draft_%s.png"%model_deets
+In addition, the mean and std. Dev. Of this array is printed out.
+
+A few more scatterplots and histograms and np arrays, with means and std devs printed out.
+
+How to adjust it:
+To adjust the neural network architecture: edit directly the definition of the object NeuralNet (lines 48 – 100). Changes made to this and paramaters should be recorded as follows in variables near the top of the file, so that the plots saved have correct filenames:
+If you change the amount and number of nodes: edit the string Arch
+If you change the method of learning rate scheduling: edit Arch (where it says MULTI)
+to change the dimension of latent space, just edit initialisation of latent_space_dim
+to change no. epochs, batch size, initial learning rate, or parameter for learning rate scheduling, then just change these variables’ initialisation (lines 27-30)
+
+
+Note: currently it has an error when trying to make the last histogram “Distance from true to Deep Sets Pred. Vertex \n for decay length > 5mm \n %s"%dlcut when dlcut = "trained only on decay length > 5mm". This is not a big problem, since this comes at the very end of running the file, and this histogram would look exactly the same as the histogram "Distance_to_true_draft_%s.png"%model_deets, since in this case the network has had only >5mm lifetime jets as training and test data, so this cut does not need to be made again.
+
+DeepSets_big_dl.py
+
+what it does: Implements deep sets algorithm with output as the decay length of the LLP associated with a jet. 
+
+What files it takes as inputs or loads: 
+Almost the same as DeepSets_big.py, except the y (target) data is the decay length, not decay position. So for example 
+    y_train = torch.load('ydl_train_%s_%s_%s_%s_%s.pt'%(iserr, mepz, poca, scal, ptc))
+
+What files it saves: 
+A plot of the loss function over epochs, a histogram of the difference (abs) between predicted and real decay length (and saves this array, and prints the mean and std dev). Also a similar histogram but only after applying the cut that the lifetime for the LLP with this jet is >5mm. And other scatterplots and histograms as in DeepSets_big_dl.py.
+
+How to adjust it:
+In the same way as DeepSets_big.py is adjusted.
+
+FullConn.py
+Basically analagous in how it runs to DeepSets_big.py and DeepSets_big_dl.py, except it is not deep sets. Right now it is set only to run on the full data set (mepz = 'hasTHETA_CHI2'), not on the >5mm lifetime only data as well.

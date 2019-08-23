@@ -1,0 +1,5 @@
+Summary of Findings so far
+- Adding in theta and track quality (chi2 and ndof) information improves the overall performance
+- training only on lifetimes > 5mm does not improve performance on these lifetimes in the test sample, but this could be due to limited statistics (the size of the training data set is much smaller)
+- there is significant over-training on the current 3*100, 3*100 architecture. The smaller architecture I tried, and have shown results for above, reduces the over-training but also reduces the performance on the test sample
+- the deep sets is still getting significantly further from the LLP vertex than CMS, but the scatterplots show it isnt doing so terribly for some  the longer lifetime events, but also not as well for some of the longer lifetime events
